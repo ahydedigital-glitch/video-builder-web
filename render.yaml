@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: video-builder-web
+    env: python
+    region: frankfurt
+    plan: standard          # or higher if you want, but Standard is fine for this
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CF_ACCOUNT_ID
+        sync: false         # set in Render dashboard
+      - key: CF_QUEUE_NAME
+        sync: false         # set in Render dashboard
+      - key: CF_API_TOKEN
+        sync: false         # set in Render dashboard
