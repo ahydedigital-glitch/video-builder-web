@@ -2,10 +2,20 @@ import os
 import uuid
 import json
 import requests
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = FastAPI(title="Video Builder Web API")
+
+# Enable CORS for n8n integration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ====================================================
 # CONFIG — Cloudflare Queues
@@ -28,30 +38,60 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
+print(f"✅ Configuration loaded:")
+print(f"   Account ID: {CF_ACCOUNT_ID}")
+print(f"   Queue Name: {CF_QUEUE_NAME}")
+print(f"   Queue URL: {QUEUE_URL}")
+
 
 # ====================================================
 # FUNCTION — Push a job into Cloudflare Queue
 # ====================================================
 def enqueue_job(job: dict):
+    """Send a job to Cloudflare Queue for processing."""
     payload = {
         "messages": [{"body": job}]
     }
 
-    resp = requests.post(
-        QUEUE_URL,
-        headers=HEADERS,
-        json=payload,
-        timeout=15
-    )
+    print(f"\n📤 Sending job to queue:")
+    print(f"   Job ID: {job.get('job_id')}")
+    print(f"   Audio URL: {job.get('audio_url')}")
+    print(f"   Image URL: {job.get('image_url')}")
 
-    if resp.status_code >= 300:
-        raise RuntimeError(
-            f"Cloudflare Queue error: status={resp.status_code}, body={resp.text}"
+    try:
+        resp = requests.post(
+            QUEUE_URL,
+            headers=HEADERS,
+            json=payload,
+            timeout=15
         )
 
-    data = resp.json()
-    if not data.get("success", False):
-        raise RuntimeError(f"Cloudflare Queue returned error: {json.dumps(data)}")
+        print(f"   Response Status: {resp.status_code}")
+
+        if resp.status_code >= 300:
+            print(f"❌ Cloudflare Queue error: {resp.text}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Cloudflare Queue error: status={resp.status_code}, body={resp.text}"
+            )
+
+        data = resp.json()
+        if not data.get("success", False):
+            print(f"❌ Cloudflare Queue returned error: {json.dumps(data)}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Cloudflare Queue returned error: {json.dumps(data)}"
+            )
+
+        print(f"✅ Job queued successfully")
+        return data
+
+    except requests.RequestException as e:
+        print(f"❌ Request failed: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to connect to Cloudflare Queue: {str(e)}"
+        )
 
 
 # ====================================================
@@ -63,6 +103,17 @@ async def queue_video(
     image_url: str = Form(...),
     date: str = Form(...)
 ):
+    """
+    Queue a video creation job.
+    
+    Args:
+        audio_url: Full URL to the MP3 audio file in R2
+        image_url: Full URL to the image file in R2
+        date: Date string for the filename (e.g., "2025-01-24")
+    
+    Returns:
+        JSON response with job details
+    """
     job_id = uuid.uuid4().hex
     final_key = f"final-video-{date}-{job_id[:8]}.mp4"
 
@@ -74,16 +125,41 @@ async def queue_video(
         "final_key": final_key,
     }
 
+    # Send to queue
     enqueue_job(job)
 
     return JSONResponse({
         "status": "queued",
         "job_id": job_id,
         "video_file": final_key,
-        "message": "Job queued. Worker will handle processing."
+        "message": "Job queued successfully. Worker will process it.",
+        "estimated_location": f"https://your-r2-bucket.com/{final_key}"
     })
 
 
 @app.get("/")
 def health():
-    return {"status": "ok", "service": "video-builder-web"}
+    """Health check endpoint."""
+    return {
+        "status": "ok",
+        "service": "video-builder-web",
+        "version": "2.0",
+        "queue": CF_QUEUE_NAME
+    }
+
+
+@app.get("/health")
+def health_detailed():
+    """Detailed health check with configuration."""
+    return {
+        "status": "ok",
+        "service": "video-builder-web",
+        "cloudflare_account": CF_ACCOUNT_ID,
+        "queue_name": CF_QUEUE_NAME,
+        "queue_url": QUEUE_URL,
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
