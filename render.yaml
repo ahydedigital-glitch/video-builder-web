@@ -3,7 +3,7 @@ services:
     name: video-builder-web
     env: python
     region: frankfurt
-    plan: standard
+    plan: starter
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
