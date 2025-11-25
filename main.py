@@ -21,17 +21,18 @@ app.add_middleware(
 # CONFIG — Cloudflare Queues
 # ====================================================
 CF_ACCOUNT_ID = os.getenv("CF_ACCOUNT_ID")
-CF_QUEUE_ID = os.getenv("CF_QUEUE_ID")  # Changed: Use Queue ID instead of name
-CF_QUEUE_NAME = os.getenv("CF_QUEUE_NAME", "video-jobs")  # Optional: For display/logging
+CF_QUEUE_ID = os.getenv("CF_QUEUE_ID")
+CF_QUEUE_NAME = os.getenv("CF_QUEUE_NAME", "video-jobs")
 CF_API_TOKEN = os.getenv("CF_API_TOKEN")
 
 required = [CF_ACCOUNT_ID, CF_QUEUE_ID, CF_API_TOKEN]
 if not all(required):
     raise RuntimeError("Missing CF_ACCOUNT_ID, CF_QUEUE_ID, or CF_API_TOKEN")
 
+# CHANGED: Use /messages/push endpoint
 QUEUE_URL = (
     f"https://api.cloudflare.com/client/v4/accounts/"
-    f"{CF_ACCOUNT_ID}/queues/{CF_QUEUE_ID}/messages"  # Changed: Use CF_QUEUE_ID
+    f"{CF_ACCOUNT_ID}/queues/{CF_QUEUE_ID}/messages/push"
 )
 
 HEADERS = {
@@ -41,8 +42,8 @@ HEADERS = {
 
 print(f"✅ Configuration loaded:")
 print(f"   Account ID: {CF_ACCOUNT_ID}")
-print(f"   Queue ID: {CF_QUEUE_ID}")  # Changed: Display Queue ID
-print(f"   Queue Name: {CF_QUEUE_NAME}")  # Added: Display friendly name
+print(f"   Queue ID: {CF_QUEUE_ID}")
+print(f"   Queue Name: {CF_QUEUE_NAME}")
 print(f"   Queue URL: {QUEUE_URL}")
 
 
@@ -157,7 +158,7 @@ def health_detailed():
         "status": "ok",
         "service": "video-builder-web",
         "cloudflare_account": CF_ACCOUNT_ID,
-        "queue_id": CF_QUEUE_ID,  # Added: Show Queue ID
+        "queue_id": CF_QUEUE_ID,
         "queue_name": CF_QUEUE_NAME,
         "queue_url": QUEUE_URL,
     }
