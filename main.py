@@ -32,7 +32,7 @@ if not all(required):
 # CHANGED: Use /messages/push endpoint
 QUEUE_URL = (
     f"https://api.cloudflare.com/client/v4/accounts/"
-    f"{CF_ACCOUNT_ID}/queues/{CF_QUEUE_ID}/messages/push"
+    f"{CF_ACCOUNT_ID}/queues/{CF_QUEUE_ID}/messages/batch"
 )
 
 HEADERS = {
