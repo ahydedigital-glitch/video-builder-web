@@ -118,7 +118,7 @@ async def queue_video(
         JSON response with job details
     """
     job_id = uuid.uuid4().hex
-    final_key = f"final-video-{date}.mp4"
+    final_key = f"Finished%20Videos/Video-{date}.mp4"
 
     job = {
         "job_id": job_id,
